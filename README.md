@@ -23,7 +23,7 @@ Production disables preview unless `PLE_DEMO_MODE=true` is explicitly set. Missi
 
 ## Connect Google and persistent accounts
 
-1. Create a Supabase project. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `APP_ORIGIN`. The service-role key must remain server-only. Use the exact browser origin, with no trailing slash, for `APP_ORIGIN`.
+1. Create a Supabase project. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and `APP_ORIGIN`. The secret key must remain server-only. Use the exact browser origin, with no trailing slash, for `APP_ORIGIN`.
 2. Run [`supabase/migrations/202609050001_attempts.sql`](supabase/migrations/202609050001_attempts.sql) in the project's SQL editor, or apply it using your normal Supabase migration workflow.
 3. In Google Cloud, create an OAuth web client. Set its authorized redirect URI to `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`.
 4. Enable **Google** in Supabase Authentication → Providers and supply the Google client ID/secret. Disable other sign-in providers for this app.

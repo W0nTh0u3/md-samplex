@@ -36,6 +36,6 @@ On this minimal Linux environment, Chromium needed NSPR/NSS/ALSA libraries. They
 - **PASS:** all nine Chromium scenarios against the production build, using an isolated preview server on port 3100, including source-page/source-file disclosure and natural explanation wrapping.
 - **PASS:** style audit confirms no Sass `@import` rules, with Tailwind’s vendor import isolated in plain CSS.
 - **PASS:** deterministic full PDF regeneration produced the same immutable version, `bank-6d472680f42e1c0a`. All 8,550 source question numbers are accounted for; 8,517 unique records remain after consolidation, with 6,840 eligible and 1,677 excluded.
-- **PASS:** sampled production client-bundle inspection across 26 JavaScript chunks found neither the sampled question text nor a service-role environment-key reference. API tests separately verify feedback is withheld until allowed.
+- **PASS:** sampled production client-bundle inspection across 26 JavaScript chunks found neither the sampled question text nor a secret-key environment-key reference. API tests separately verify feedback is withheld until allowed.
 
 The successful local checks do not close the live infrastructure, exhaustive content review, or browser/device acceptance items above.

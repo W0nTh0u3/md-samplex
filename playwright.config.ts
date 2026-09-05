@@ -27,7 +27,7 @@ export default defineConfig({
       PLE_DEMO_MODE: "true",
       APP_ORIGIN: origin,
       // Keep automated preview tests isolated from configured cloud accounts.
-      SUPABASE_SERVICE_ROLE_KEY: "",
+      SUPABASE_SECRET_KEY: "",
     },
   },
 });
