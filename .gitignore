@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env*
+client_secret_*.json
+!.env.example
+.venv/
+__pycache__/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.local/
+raw pdfs/

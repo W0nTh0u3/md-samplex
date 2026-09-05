@@ -1,0 +1,42 @@
+{
+  "name": "ple-practice",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build --webpack",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "tsx --test tests/*.test.ts",
+    "test:browser": "playwright test",
+    "audit:styles": "node scripts/audit-styles.mjs",
+    "extract": ".venv/bin/python scripts/extract.py",
+    "validate:bank": ".venv/bin/python scripts/extract.py --check"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "lucide-react": "^0.563.0",
+    "next": "^16.3.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "server-only": "^0.0.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^22.19.11",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.6",
+    "prettier": "^3.9.6",
+    "sass": "^1.104.0",
+    "tailwindcss": "^4.1.18",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

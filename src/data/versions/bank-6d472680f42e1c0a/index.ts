@@ -1,0 +1,13 @@
+import { questions as q0 } from "./biochemistry";
+import { questions as q1 } from "./anatomy";
+import { questions as q2 } from "./microbiology";
+import { questions as q3 } from "./physiology";
+import { questions as q4 } from "./legal-medicine";
+import { questions as q5 } from "./pathology";
+import { questions as q6 } from "./pharmacology";
+import { questions as q7 } from "./surgery";
+import { questions as q8 } from "./internal-medicine";
+import { questions as q9 } from "./obstetrics-gynecology";
+import { questions as q10 } from "./pediatrics";
+import { questions as q11 } from "./preventive-medicine";
+export const questions = [...q0, ...q1, ...q2, ...q3, ...q4, ...q5, ...q6, ...q7, ...q8, ...q9, ...q10, ...q11];
