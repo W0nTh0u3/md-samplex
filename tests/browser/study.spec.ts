@@ -117,6 +117,28 @@ test("dashboard setup, keyboard answers, practice locking, refresh and results",
   await expect(page.locator(".result-question")).toHaveCount(1);
 });
 
+test("logout failures use a human-readable message", async ({ page }) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Explore your subjects" }),
+  ).toBeVisible();
+  await page.route("**/api/logout", async (route) => {
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Request origin is not permitted." }),
+    });
+  });
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+
+  const alert = page.locator('.notice.error[role="alert"]');
+  await expect(alert).toContainText(
+    "We couldn't sign you out. Please refresh and try again.",
+  );
+  await expect(alert).not.toContainText("Request origin is not permitted.");
+});
+
 test("server rejects stale saves, answer leakage, cross-account access and CSRF", async ({
   page,
   browser,

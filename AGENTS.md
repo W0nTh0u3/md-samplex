@@ -29,6 +29,17 @@ These standards apply to all repository work.
 - Preserve focus visibility, mobile density, natural clinical-text wrapping, and reduced-motion behavior.
 - Run the styling and browser checks after visual changes.
 
+### Component maintainability
+
+- Split components by feature responsibility, not arbitrary line counts. Use file size as a review signal rather than enforcing a rigid maximum.
+- Keep stateful orchestration thin and move presentational feature sections into focused components with clear ownership.
+- Keep component-specific styles colocated in the owning CSS Module.
+- Extract shared components only when reuse or a clear shared responsibility exists.
+- Treat generated data and immutable artifacts as intentional exceptions to ordinary file-size and refactoring guidance.
+- Avoid duplicate markup, duplicated responsive rules, and parallel implementations of the same state.
+- Preserve public entrypoints and behavior during structural refactors.
+- After UI refactors, run formatting, typecheck, lint, unit/database, build, style, and browser checks.
+
 ## PLE Practice project requirements
 
 - `docs/MVP_PLAN.md` records the approved product scope. Keep setup and verification status in `README.md` and `docs/VERIFICATION.md`.

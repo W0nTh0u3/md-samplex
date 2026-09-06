@@ -1,4 +1,4 @@
-@use "../styles/mixins" as *;
+@use "../styles/mixins" as mixins;
 
 .modal {
   width: min(560px, calc(100% - 32px));
@@ -6,7 +6,7 @@
   margin: auto;
   padding: 32px;
   overflow: auto;
-  @include card(var(--radius-xl), var(--shadow-elevated));
+  @include mixins.card(var(--radius-xl), var(--shadow-elevated));
   color: var(--ink);
 
   &::backdrop {

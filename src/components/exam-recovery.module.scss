@@ -1,0 +1,13 @@
+.recoveryDifferences {
+  max-height: 180px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+
+  p {
+    margin-bottom: 7px;
+    font-size: 13px;
+  }
+}

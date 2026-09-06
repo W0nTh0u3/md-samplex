@@ -1,36 +1,43 @@
-@use "./tokens" as *;
-@use "./mixins" as *;
+@use "./mixins" as mixins;
+@use "./tokens" as tokens;
 
 :root {
   color-scheme: light;
-  --canvas: #{$canvas};
-  --surface: #{$surface};
-  --ink: #{$ink};
-  --ink-secondary: #{$ink-secondary};
-  --muted: #{$muted};
-  --faint: #{$faint};
-  --line: #{$line};
-  --blue: #{$blue};
-  --blue-active: #{$blue-active};
-  --indigo: #{$indigo};
-  --sky: #{$sky};
-  --purple: #{$purple};
-  --purple-deep: #{$purple-deep};
-  --pink: #{$pink};
-  --orange: #{$orange};
-  --orange-deep: #{$orange-deep};
-  --teal: #{$teal};
-  --green: #{$green};
-  --brown: #{$brown};
-  --radius-xs: #{$radius-xs};
-  --radius-sm: #{$radius-sm};
-  --radius-md: #{$radius-md};
-  --radius-lg: #{$radius-lg};
-  --radius-xl: #{$radius-xl};
-  --radius-full: #{$radius-full};
-  --shadow-soft: #{$shadow-soft};
-  --shadow-elevated: #{$shadow-elevated};
-  font-family: $font-family;
+  --canvas: #{tokens.$canvas};
+  --surface: #{tokens.$surface};
+  --ink: #{tokens.$ink};
+  --ink-secondary: #{tokens.$ink-secondary};
+  --muted: #{tokens.$muted};
+  --faint: #{tokens.$faint};
+  --line: #{tokens.$line};
+  --blue: #{tokens.$blue};
+  --blue-active: #{tokens.$blue-active};
+  --indigo: #{tokens.$indigo};
+  --sky: #{tokens.$sky};
+  --purple: #{tokens.$purple};
+  --purple-deep: #{tokens.$purple-deep};
+  --pink: #{tokens.$pink};
+  --orange: #{tokens.$orange};
+  --orange-deep: #{tokens.$orange-deep};
+  --teal: #{tokens.$teal};
+  --green: #{tokens.$green};
+  --brown: #{tokens.$brown};
+  --on-primary: #{tokens.$on-primary};
+  --surface-hover: #{tokens.$surface-hover};
+  --selection: #{tokens.$selection};
+  --icon-button-surface: #{tokens.$icon-button-surface};
+  --icon-button-surface-hover: #{tokens.$icon-button-surface-hover};
+  --error-border: #{tokens.$error-border};
+  --error-surface: #{tokens.$error-surface};
+  --radius-xs: #{tokens.$radius-xs};
+  --radius-sm: #{tokens.$radius-sm};
+  --radius-md: #{tokens.$radius-md};
+  --radius-lg: #{tokens.$radius-lg};
+  --radius-xl: #{tokens.$radius-xl};
+  --radius-full: #{tokens.$radius-full};
+  --shadow-soft: #{tokens.$shadow-soft};
+  --shadow-elevated: #{tokens.$shadow-elevated};
+  font-family: tokens.$font-family;
   font-feature-settings: "lnum", "locl";
 }
 
@@ -48,7 +55,7 @@ body {
   margin: 0;
   background: var(--canvas);
   color: var(--ink);
-  font-family: $font-family;
+  font-family: tokens.$font-family;
   font-size: 15px;
   font-feature-settings: "lnum", "locl";
 }
@@ -71,7 +78,7 @@ input {
 }
 
 button {
-  @include control;
+  @include mixins.control;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -82,29 +89,29 @@ button {
   letter-spacing: 0;
   min-height: 44px;
   cursor: pointer;
-}
 
-button:hover:not(:disabled) {
-  background: #f0efed;
-  color: var(--ink);
-}
+  &:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--ink);
+  }
 
-button:active:not(:disabled) {
-  transform: translateY(1px);
-}
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
 
-button:disabled {
-  color: var(--faint);
-  cursor: not-allowed;
+  &:disabled {
+    color: var(--faint);
+    cursor: not-allowed;
+  }
 }
 
 a {
   color: var(--ink);
   text-decoration: none;
-}
 
-a:hover {
-  color: var(--blue);
+  &:hover {
+    color: var(--blue);
+  }
 }
 
 input {
@@ -112,12 +119,11 @@ input {
   font: inherit;
 }
 
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 3px;
+button,
+a,
+input,
+summary {
+  @include mixins.focus-ring;
 }
 
 h1,
@@ -172,7 +178,7 @@ legend {
 }
 
 ::selection {
-  background: #cfe5fb;
+  background: var(--selection);
 }
 
 .muted {
@@ -205,19 +211,19 @@ legend {
   border: 1px solid var(--blue);
   border-radius: var(--radius-full);
   background: var(--blue);
-  color: #fff;
+  color: var(--on-primary);
   font-size: 16px;
   font-weight: 500;
   letter-spacing: 0;
-}
 
-.primary:hover:not(:disabled) {
-  background: var(--blue-active);
-  color: #fff;
-}
+  &:hover:not(:disabled) {
+    background: var(--blue-active);
+    color: var(--on-primary);
+  }
 
-.primary:active:not(:disabled) {
-  transform: scale(0.98);
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
 }
 
 .full {
@@ -230,11 +236,11 @@ legend {
   height: 44px;
   padding: 0;
   border-radius: var(--radius-full);
-  background: rgba(0, 0, 0, 0.05);
-}
+  background: var(--icon-button-surface);
 
-.icon-button:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.09);
+  &:hover:not(:disabled) {
+    background: var(--icon-button-surface-hover);
+  }
 }
 
 .eyebrow {
@@ -253,12 +259,12 @@ legend {
   padding: 14px;
   border-radius: var(--radius-md);
   background: var(--blue);
-  color: #fff;
-}
+  color: var(--on-primary);
 
-.skip-link:focus {
-  top: 16px;
-  color: #fff;
+  &:focus {
+    top: 16px;
+    color: var(--on-primary);
+  }
 }
 
 .section-head {
@@ -267,41 +273,57 @@ legend {
   justify-content: space-between;
   gap: 20px;
   margin-bottom: 22px;
-}
 
-.section-head p {
-  margin-top: 7px;
-  font-size: 15px;
+  p {
+    margin-top: 7px;
+    font-size: 15px;
+  }
 }
 
 .notice {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 10px;
   margin-bottom: 20px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--muted);
+  color: var(--ink-secondary);
   font-size: 14px;
-}
+  line-height: 1.45;
 
-.notice.error {
-  border-color: #f2c5a9;
-  box-shadow: inset 3px 0 var(--orange);
-  color: var(--orange-deep);
-}
+  > svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--muted);
+  }
 
-.notice button {
-  flex-shrink: 0;
-  margin-left: auto;
-  border-color: var(--line);
-  font-size: 14px;
-}
+  &.error {
+    border-color: var(--error-border);
+    border-left: 3px solid var(--orange);
+    background: var(--error-surface);
+    color: var(--orange-deep);
 
-.notice p {
-  margin: 0;
+    > svg {
+      color: var(--orange);
+    }
+  }
+
+  > span {
+    min-width: 0;
+  }
+
+  button {
+    flex-shrink: 0;
+    margin-left: auto;
+    border-color: var(--line);
+    font-size: 14px;
+  }
+
+  p {
+    margin: 0;
+  }
 }
 
 .loading-state {
@@ -321,10 +343,10 @@ legend {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 26px;
-}
 
-.dialog-actions button:not(.primary) {
-  border-color: var(--line);
+  button:not(.primary) {
+    border-color: var(--line);
+  }
 }
 
 .sr-only {

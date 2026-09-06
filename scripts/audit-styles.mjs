@@ -7,7 +7,13 @@ const scssFiles = [
   "src/styles/_tokens.scss",
   "src/styles/_mixins.scss",
   "src/components/study-app.module.scss",
+  "src/components/study-dashboard.module.scss",
+  "src/components/study-entry.module.scss",
   "src/components/exam.module.scss",
+  "src/components/exam-question.module.scss",
+  "src/components/exam-feedback.module.scss",
+  "src/components/exam-results.module.scss",
+  "src/components/exam-recovery.module.scss",
   "src/components/modal.module.scss",
 ];
 const files = [...scssFiles, "src/styles/tailwind.css"];
@@ -47,18 +53,18 @@ if (tailwindStyles.trim() !== '@import "tailwindcss";') {
   );
 }
 
-const examStyles = contents.find(
-  ([file]) => file === "src/components/exam.module.scss",
+const feedbackStyles = contents.find(
+  ([file]) => file === "src/components/exam-feedback.module.scss",
 )[1];
-const feedbackBlocks = examStyles.match(/^\s*\.feedback\s*\{/gm) ?? [];
+const feedbackBlocks = feedbackStyles.match(/^\s*\.feedback\s*\{/gm) ?? [];
 if (feedbackBlocks.length !== 2) {
   violations.push(
-    `src/components/exam.module.scss: expected one feedback implementation and one responsive override, found ${feedbackBlocks.length}`,
+    `src/components/exam-feedback.module.scss: expected one feedback implementation and one responsive override, found ${feedbackBlocks.length}`,
   );
 }
-if (!/\.explanation\s*\{[\s\S]*white-space:\s*normal/i.test(examStyles)) {
+if (!/\.explanation\s*\{[\s\S]*white-space:\s*normal/i.test(feedbackStyles)) {
   violations.push(
-    "src/components/exam.module.scss: explanation text must use natural whitespace",
+    "src/components/exam-feedback.module.scss: explanation text must use natural whitespace",
   );
 }
 
