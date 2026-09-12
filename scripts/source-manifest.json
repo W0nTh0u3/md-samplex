@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "description": "Opt-in source inventory for immutable bank generation. Disabled sources never affect extraction.",
+  "sources": [
+    {
+      "path": "raw pdfs/402059824-11-Topnotch-Pediatrics-SuperExam-pdf.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/405018649-1-Topnotch-Biochemistry-SuperExam1-pdf.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/405182480-10-Topnotch-Obstetrics-Gynecology-SuperExam1-pdf.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/416159016-kupdf-net-9-topnotch-internal-medicine-superexampdf-pdf.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/450203791-7-Topnotch-Pharmacology-SuperExam.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/520029701-06-Topnotch-Pathology-SuperExam-NOHIGHLIGHTS.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/608745822-Karl-Avillo-Microbiology.pdf",
+      "kind": "pdf",
+      "parser": "microbiology",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/648943957-4-Topnotch-Physiology-SuperExam.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/648945218-TopNotch-Merged.pdf",
+      "kind": "pdf",
+      "parser": "superexam",
+      "role": "canonical",
+      "enabled": true
+    },
+    {
+      "path": "raw pdfs/821551629-Ple-Test-Bank-compressed.pdf",
+      "kind": "pdf",
+      "parser": "ocr-layout",
+      "enabled": false,
+      "reviewStatus": "needs_review",
+      "ocr": {
+        "pages": [
+          [1, 435]
+        ],
+        "reviewSamplePages": [
+          [1, 10],
+          [216, 225],
+          [426, 435]
+        ],
+        "dpi": 300,
+        "language": "eng",
+        "psm": 6,
+        "layout": "tesseract-tsv",
+        "columnSplitX": 1130
+      }
+    },
+    {
+      "path": "raw notion/ple-qbank",
+      "kind": "notion",
+      "parser": "notion-export",
+      "enabled": false,
+      "reviewStatus": "needs_review",
+      "canonicalUrl": "https://plereviewhub.notion.site/5534be59f2684365b4c4d9be5a70af86"
+    },
+    {
+      "path": ".local/notion-public-snapshot.json",
+      "kind": "notion",
+      "parser": "notion-public-snapshot",
+      "enabled": true,
+      "reviewStatus": "source_annotations_verified",
+      "answerHighlightsVerified": true,
+      "canonicalUrl": "https://plereviewhub.notion.site/5534be59f2684365b4c4d9be5a70af86"
+    }
+  ]
+}

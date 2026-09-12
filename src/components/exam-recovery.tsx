@@ -1,5 +1,6 @@
 "use client";
 import { Download } from "lucide-react";
+import { answerSetsEqual, formatAnswer } from "@/lib/answers";
 import type { AttemptView, Draft } from "@/lib/types";
 import { Modal } from "./modal";
 import styles from "./exam-recovery.module.scss";
@@ -19,8 +20,17 @@ export function ExamRecovery({
   close,
   restore,
 }: ExamRecoveryProps) {
-  const differences = Object.entries(draft.view.attempt.answers).filter(
-    ([id, answer]) => current.attempt.answers[id] !== answer,
+  const differenceIds = [
+    ...new Set([
+      ...Object.keys(current.attempt.answers),
+      ...Object.keys(draft.view.attempt.answers),
+    ]),
+  ].filter(
+    (id) =>
+      !answerSetsEqual(
+        current.attempt.answers[id],
+        draft.view.attempt.answers[id],
+      ),
   );
 
   function download() {
@@ -39,7 +49,7 @@ export function ExamRecovery({
     <Modal title="Your saved local draft" close={close}>
       <p>
         Saved {new Date(draft.savedAt).toLocaleString()}. There are{" "}
-        {differences.length} answers that differ from the current session.
+        {differenceIds.length} answers that differ from the current session.
       </p>
       <p>
         Restoring copies its editable answers and review flags into this
@@ -47,10 +57,11 @@ export function ExamRecovery({
         decrease.
       </p>
       <div className={styles.recoveryDifferences}>
-        {differences.map(([id, answer]) => (
+        {differenceIds.map((id) => (
           <p key={id}>
             Question {current.attempt.questionIds.indexOf(id) + 1}: current{" "}
-            {current.attempt.answers[id] ?? "unanswered"} → draft {answer}
+            {formatAnswer(current.attempt.answers[id])} → draft{" "}
+            {formatAnswer(draft.view.attempt.answers[id])}
           </p>
         ))}
       </div>

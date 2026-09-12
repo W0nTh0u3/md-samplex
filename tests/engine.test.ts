@@ -5,6 +5,7 @@ import {
   checkAnswer,
   createAttempt,
   duration,
+  normalizeAttemptAnswers,
   publicView,
   selectQuestions,
   submitAttempt,
@@ -39,6 +40,34 @@ const edits = (a: ReturnType<typeof create>): Edits => ({
   remainingMs: a.remainingMs,
   status: a.status,
 });
+const multipleQuestion: Question = {
+  ...bank[0],
+  id: "multiple-q",
+  answerMode: "multiple",
+  correctChoice: null,
+  correctChoices: ["A", "C"],
+};
+const multipleBank: Question[] = [multipleQuestion, ...bank.slice(1)];
+const createMultiple = (mode: "practice" | "ple" | "topnotch" = "practice") => {
+  const attempt = createAttempt(
+    "owner",
+    "editor",
+    "v1",
+    multipleBank,
+    "biochemistry",
+    mode,
+    25,
+  );
+  return {
+    ...attempt,
+    questionIds: [multipleQuestion.id, ...bank.slice(1, 25).map((q) => q.id)],
+    answers: {},
+  };
+};
+const editsWithAnswers = (
+  a: ReturnType<typeof create>,
+  answers: Edits["answers"],
+): Edits => ({ ...edits(a), answers });
 
 test("pacing is proportional and elapsed-time checkpoints clamp at zero", () => {
   assert.equal(duration("ple", 25), 30 * 60 * 1000);
@@ -78,6 +107,45 @@ test("practice check reveals only the checked answer and locks it", () => {
   assert.equal(checkAnswer(a, id).checked.length, 1);
 });
 
+test("choice rationales stay secret until feedback and fall back to the keyed rationale", () => {
+  const rationaleBank = bank.map((question, index) =>
+    index === 0
+      ? {
+          ...question,
+          explanation: "",
+          choiceRationales: {
+            A: "A is not the source answer.",
+            B: "B is the source answer.",
+            C: "C is not the source answer.",
+            D: "D is not the source answer.",
+          },
+        }
+      : question,
+  );
+  let a = createAttempt(
+    "owner",
+    "editor",
+    "v1",
+    rationaleBank,
+    "biochemistry",
+    "practice",
+    100,
+  );
+  const id = "q0";
+  assert.equal(
+    JSON.stringify(publicView(a, rationaleBank)).includes("rationale"),
+    false,
+  );
+  a = applyEdits(a, { ...edits(a), answers: { [id]: "A" } }, rationaleBank);
+  a = checkAnswer(a, id);
+  const feedback = publicView(a, rationaleBank).questions.find(
+    (q) => q.id === id,
+  )!.feedback!;
+  assert.equal(feedback.explanation, "B is the source answer.");
+  assert.deepEqual(feedback.choiceRationales?.B, "B is the source answer.");
+  assert.deepEqual(feedback.sources, [{ filename: "fixture.pdf", pages: [1] }]);
+});
+
 test("timed answers remain editable and reveal nothing until server submission", () => {
   let a = create("ple");
   const id = a.questionIds[0];
@@ -93,6 +161,174 @@ test("timed answers remain editable and reveal nothing until server submission",
   assert.ok(publicView(final, bank).questions.every((q) => q.feedback));
   assert.strictEqual(submitAttempt(final, bank), final);
   assert.throws(() => applyEdits(final, edits(a), bank), /submitted/);
+});
+
+test("multiple-response answers use exact sets and preserve legacy strings", () => {
+  const id = multipleQuestion.id;
+  const answer = (value: string | string[]) => {
+    const attempt = createMultiple();
+    return applyEdits(
+      attempt,
+      editsWithAnswers(attempt, { [id]: value }),
+      multipleBank,
+    );
+  };
+
+  const partial = answer(["A"]);
+  assert.equal(submitAttempt(partial, multipleBank).score, 0);
+  const extra = answer(["A", "B", "C"]);
+  assert.equal(submitAttempt(extra, multipleBank).score, 0);
+
+  const exact = answer(["C", "A"]);
+  assert.equal(submitAttempt(exact, multipleBank).score, 1);
+  const feedback = publicView(submitAttempt(exact, multipleBank), multipleBank)
+    .questions[0].feedback!;
+  assert.equal(feedback.answerMode, "multiple");
+  assert.equal(feedback.correctChoice, null);
+  assert.deepEqual(feedback.correctChoices, ["A", "C"]);
+
+  for (const invalid of [["A", "A"], [], ["A", "E"]]) {
+    assert.throws(
+      () => answer(invalid),
+      /Multiple-response answers must be a non-empty array of unique choices/,
+    );
+  }
+  assert.throws(
+    () => answer("A"),
+    /Multiple-response answers must be a non-empty array of unique choices/,
+  );
+
+  const legacy = {
+    ...createMultiple(),
+    answers: { [id]: "A" },
+  };
+  assert.deepEqual(normalizeAttemptAnswers(legacy, multipleBank).answers[id], [
+    "A",
+  ]);
+  assert.deepEqual(publicView(legacy, multipleBank).attempt.answers[id], ["A"]);
+  assert.equal(submitAttempt(legacy, multipleBank).score, 0);
+
+  const single = createMultiple();
+  const singleId = single.questionIds[1];
+  assert.throws(
+    () =>
+      applyEdits(
+        single,
+        editsWithAnswers(single, { [singleId]: ["B"] }),
+        multipleBank,
+      ),
+    /Single-answer questions require exactly one valid choice/,
+  );
+});
+
+test("multiple-response practice feedback locks the selected set and keeps rationales secret", () => {
+  const id = multipleQuestion.id;
+  const rationaleBank = multipleBank.map((question) =>
+    question.id === id
+      ? {
+          ...question,
+          explanation: "",
+          choiceRationales: {
+            A: "A is supported.",
+            B: "B is not supported.",
+            C: "C is supported.",
+            D: "D is not supported.",
+          },
+        }
+      : question,
+  );
+  let a = createAttempt(
+    "owner",
+    "editor",
+    "v1",
+    rationaleBank,
+    "biochemistry",
+    "practice",
+    25,
+  );
+  a = { ...a, questionIds: [id, ...bank.slice(1, 25).map((q) => q.id)] };
+  assert.equal(publicView(a, rationaleBank).questions[0].feedback, undefined);
+  a = applyEdits(a, editsWithAnswers(a, { [id]: ["A", "C"] }), rationaleBank);
+  a = checkAnswer(a, id);
+  const checked = publicView(a, rationaleBank).questions[0];
+  assert.deepEqual(checked.feedback?.correctChoices, ["A", "C"]);
+  assert.equal(
+    checked.feedback?.explanation,
+    "A is supported. C is supported.",
+  );
+  assert.equal(checked.feedback?.choiceRationales?.B, "B is not supported.");
+  assert.deepEqual(
+    applyEdits(a, editsWithAnswers(a, { [id]: ["C", "A"] }), rationaleBank)
+      .answers[id],
+    ["C", "A"],
+  );
+  assert.throws(
+    () => applyEdits(a, editsWithAnswers(a, { [id]: ["A"] }), rationaleBank),
+    /locked/,
+  );
+});
+
+test("question and shared-case visuals stay answer-neutral until feedback", () => {
+  const visual = (id: string, visibility: "question" | "feedback") => ({
+    id,
+    path: `/assets/${id}.png`,
+    sha256: "a".repeat(64),
+    kind: "diagram" as const,
+    alt: `Verified ${id} diagram`,
+    visibility,
+  });
+  const visualBank = bank.map((question, index) =>
+    index === 0
+      ? {
+          ...question,
+          visuals: [
+            visual("question-context", "question"),
+            visual("marked-answer", "feedback"),
+          ],
+          sharedCase: {
+            id: "visual-case",
+            text: "A verified shared case.",
+            visuals: [visual("case-answer", "feedback")],
+          },
+        }
+      : question,
+  );
+  let attempt = createAttempt(
+    "owner",
+    "editor",
+    "v1",
+    visualBank,
+    "biochemistry",
+    "practice",
+    25,
+  );
+  attempt = {
+    ...attempt,
+    questionIds: ["q0", ...bank.slice(1, 25).map((q) => q.id)],
+  };
+
+  const before = publicView(attempt, visualBank).questions[0];
+  assert.deepEqual(
+    before.visuals?.map((item) => item.id),
+    ["question-context"],
+  );
+  assert.deepEqual(before.sharedCase?.visuals, undefined);
+
+  attempt = applyEdits(
+    attempt,
+    editsWithAnswers(attempt, { q0: "B" }),
+    visualBank,
+  );
+  attempt = checkAnswer(attempt, "q0");
+  const after = publicView(attempt, visualBank).questions[0];
+  assert.deepEqual(
+    after.visuals?.map((item) => item.id),
+    ["question-context", "marked-answer"],
+  );
+  assert.deepEqual(
+    after.sharedCase?.visuals?.map((item) => item.id),
+    ["case-answer"],
+  );
 });
 
 test("invalid answers, navigation, flags and extended clocks are rejected", () => {

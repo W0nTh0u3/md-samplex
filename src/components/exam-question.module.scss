@@ -74,6 +74,7 @@
   display: flex;
   align-items: flex-start;
   gap: 15px;
+  min-height: 56px;
   padding: 17px 19px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -162,6 +163,21 @@
   font-size: 16px;
   line-height: 1.55;
   white-space: pre-line;
+}
+
+.answerInstruction {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.caseVisuals {
+  margin-bottom: 0;
+}
+
+.caseFeedbackVisuals {
+  margin-top: 18px;
+  margin-bottom: 0;
 }
 
 .checkRow {

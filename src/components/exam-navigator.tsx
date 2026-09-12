@@ -1,5 +1,11 @@
 "use client";
 import { ArrowRight, Check, Clock3, Pause, Play, XCircle } from "lucide-react";
+import {
+  countAnswered,
+  feedbackAnswerIsCorrect,
+  formatAnswer,
+  hasAnswer,
+} from "@/lib/answers";
 import type { Attempt, PublicQuestion } from "@/lib/types";
 import { cx, formatTime } from "./component-utils";
 import styles from "./exam-question.module.scss";
@@ -31,7 +37,7 @@ export function ExamNavigator({
   onNavigate,
   onSubmit,
 }: ExamNavigatorProps) {
-  const answered = Object.keys(attempt.answers).length;
+  const answered = countAnswered(attempt.answers);
   return (
     <aside
       className={cx(styles.examAside, visible && styles.visible)}
@@ -87,47 +93,55 @@ export function ExamNavigator({
           </span>
         </div>
         <div className={cx(styles.questionGrid, "question-grid")}>
-          {questions.map((question, index) => (
-            <button
-              key={question.id}
-              aria-label={`Question ${index + 1}${attempt.checked.includes(question.id) ? (attempt.answers[question.id] === question.feedback?.correctChoice ? ", checked correct" : ", checked incorrect") : attempt.answers[question.id] ? ", answered" : ", unanswered"}${attempt.flags.includes(question.id) ? ", flagged" : ""}`}
-              aria-current={attempt.position === index ? "step" : undefined}
-              disabled={paused || busy}
-              className={cx(
-                attempt.checked.includes(question.id)
-                  ? attempt.answers[question.id] ===
-                    question.feedback?.correctChoice
-                    ? cx(styles.checkedCorrect, "checked-correct")
-                    : cx(styles.checkedIncorrect, "checked-incorrect")
-                  : attempt.answers[question.id]
-                    ? cx(styles.answered, "answered")
-                    : undefined,
-                attempt.position === index && styles.current,
-                attempt.flags.includes(question.id) && styles.flagged,
-              )}
-              onClick={() => onNavigate(index)}
-            >
-              {index + 1}
-              {attempt.checked.includes(question.id) &&
-                (attempt.answers[question.id] ===
-                question.feedback?.correctChoice ? (
-                  <Check
-                    size={10}
-                    className={styles.navigatorResultIcon}
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <XCircle
-                    size={10}
-                    className={styles.navigatorResultIcon}
-                    aria-hidden="true"
-                  />
-                ))}
-              {attempt.flags.includes(question.id) && (
-                <span className={styles.flagDot} />
-              )}
-            </button>
-          ))}
+          {questions.map((question, index) => {
+            const selected = attempt.answers[question.id];
+            const answeredQuestion = hasAnswer(selected);
+            const checkedCorrect = Boolean(
+              attempt.checked.includes(question.id) &&
+              question.feedback &&
+              feedbackAnswerIsCorrect(question.feedback, selected),
+            );
+            const checked = attempt.checked.includes(question.id);
+            return (
+              <button
+                key={question.id}
+                aria-label={`Question ${index + 1}${checked ? (checkedCorrect ? ", checked correct" : ", checked incorrect") : answeredQuestion ? `, answered ${formatAnswer(selected)}` : ", unanswered"}${attempt.flags.includes(question.id) ? ", flagged" : ""}`}
+                aria-current={attempt.position === index ? "step" : undefined}
+                disabled={paused || busy}
+                className={cx(
+                  checked
+                    ? checkedCorrect
+                      ? cx(styles.checkedCorrect, "checked-correct")
+                      : cx(styles.checkedIncorrect, "checked-incorrect")
+                    : answeredQuestion
+                      ? cx(styles.answered, "answered")
+                      : undefined,
+                  attempt.position === index && styles.current,
+                  attempt.flags.includes(question.id) && styles.flagged,
+                )}
+                onClick={() => onNavigate(index)}
+              >
+                {index + 1}
+                {checked &&
+                  (checkedCorrect ? (
+                    <Check
+                      size={10}
+                      className={styles.navigatorResultIcon}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <XCircle
+                      size={10}
+                      className={styles.navigatorResultIcon}
+                      aria-hidden="true"
+                    />
+                  ))}
+                {attempt.flags.includes(question.id) && (
+                  <span className={styles.flagDot} />
+                )}
+              </button>
+            );
+          })}
         </div>
         <div className={styles.navigatorLegend}>
           <span>

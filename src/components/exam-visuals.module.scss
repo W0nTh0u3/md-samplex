@@ -1,0 +1,62 @@
+@use "../styles/tokens" as tokens;
+
+.visuals {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 26px;
+}
+
+.visual {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+
+.frame {
+  overflow: hidden;
+  background: #eeece9;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    transition: transform 240ms ease;
+  }
+
+  &:hover img {
+    transform: scale(1.01);
+  }
+}
+
+.visual figcaption {
+  padding: 10px 14px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+
+  span {
+    color: var(--ink-secondary);
+    font-weight: 600;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame img {
+    transition: none;
+  }
+}
+
+@media (max-width: tokens.$breakpoint-small) {
+  .visuals {
+    margin-bottom: 22px;
+  }
+
+  .visual figcaption {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}

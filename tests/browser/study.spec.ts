@@ -65,22 +65,31 @@ test("dashboard setup, keyboard answers, practice locking, refresh and results",
   );
   await expect(page.locator(".feedback")).toBeVisible();
   await expect(page.locator(".feedback-verdict h2")).toBeFocused();
-  await expect(page.getByTestId("feedback-explanation")).toHaveCSS(
-    "white-space",
-    "normal",
-  );
-  const sourcePages = page.locator("details").filter({
-    hasText: "View source pages",
+  const choiceRationales = page.getByTestId("feedback-choice-rationales");
+  if (await choiceRationales.isVisible()) {
+    await expect(
+      choiceRationales.getByTestId("feedback-choice-rationale").first(),
+    ).toBeVisible();
+  } else {
+    await expect(page.getByTestId("feedback-explanation")).toHaveCSS(
+      "white-space",
+      "normal",
+    );
+  }
+  const sourceLocations = page.locator("details").filter({
+    hasText: /View source (pages|locations)/,
   });
   const sourceFiles = page.locator("details").filter({
     hasText: "Show source files",
   });
-  await expect(sourcePages).toBeVisible();
+  await expect(sourceLocations).toBeVisible();
   await expect(sourceFiles).toBeVisible();
   await expect(sourceFiles.locator("strong").first()).toBeHidden();
-  await sourcePages.locator("summary").click();
+  await sourceLocations.locator("summary").click();
   await expect(
-    sourcePages.getByText(/Question \/ explanation: pages/).first(),
+    sourceLocations
+      .getByText(/Question \/ explanation: pages|Notion locator:/)
+      .first(),
   ).toBeVisible();
   await sourceFiles.locator("summary").click();
   await expect(sourceFiles.locator("strong").first()).toBeVisible();

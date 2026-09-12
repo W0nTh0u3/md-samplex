@@ -71,9 +71,14 @@ export async function readMutation(request: Request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+const answerLabel = z.string().regex(/^[A-E]$/);
+
 export const editsSchema = z
   .object({
-    answers: z.record(z.string().max(100), z.string().regex(/^[A-E]$/)),
+    answers: z.record(
+      z.string().max(100),
+      z.union([answerLabel, z.array(answerLabel).min(1).max(5)]),
+    ),
     flags: z.array(z.string().max(100)).max(100),
     position: z.number().int().min(0).max(99),
     remainingMs: z.number().finite().min(0).nullable(),

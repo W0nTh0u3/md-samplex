@@ -15,44 +15,88 @@ test("complete bank has unique IDs, valid source keys, original options and expl
   assert.equal(new Set(questions.map((q) => q.id)).size, questions.length);
   assert.equal(report.total, questions.length);
   assert.equal(report.validated + report.needsReview, questions.length);
-  assert.equal(report.files.length, 9);
+  assert.equal(
+    report.files.filter((file: { kind?: string }) => file.kind !== "notion")
+      .length,
+    9,
+  );
+  assert.equal(
+    report.files.filter((file: { kind?: string }) => file.kind === "notion")
+      .length,
+    1,
+  );
   assert.deepEqual(report.unparsedPages, []);
   assert.deepEqual(report.unparsedRows, []);
+  const pdfQuestions = questions.filter((q) =>
+    q.sources.every((source) => source.kind !== "notion"),
+  );
+  const notionQuestions = questions.filter((q) =>
+    q.sources.some((source) => source.kind === "notion"),
+  );
   // All 8,400 Superexam and 150 Avillo source numbers are accounted for,
-  // including records consolidated at different original numbers.
+  // including records consolidated at different original numbers. Notion
+  // records have independent locators and are counted in their own inventory.
   assert.equal(
-    questions.length +
+    pdfQuestions.length +
       report.duplicates.filter(
         (d: { method: string }) => d.method === "identical_content",
       ).length,
     8550,
   );
+  assert.equal(notionQuestions.length, report.notion[0].records);
   const reviews = new Set(report.review.map((q: Question) => q.id));
   for (const q of questions) {
     assert.ok(q.sources.length > 0, q.id);
-    assert.ok(
-      q.sources.every(
-        (s) =>
-          s.pages.length > 0 &&
-          s.pages.every((p) => Number.isInteger(p) && p > 0),
-      ),
-      q.id,
-    );
+    if (q.sources.some((source) => source.kind === "notion")) {
+      assert.ok(
+        q.sources.some((source) => source.locator && source.url),
+        q.id,
+      );
+    } else {
+      assert.ok(
+        q.sources.every(
+          (s) =>
+            s.pages.length > 0 &&
+            s.pages.every((p) => Number.isInteger(p) && p > 0),
+        ),
+        q.id,
+      );
+    }
     if (q.status === "validated") {
       assert.equal(q.issues.length, 0, q.id);
       assert.ok(q.explanation.length > 0 && q.stem.length >= 15, q.id);
-      assert.ok(
-        q.choices.some((c) => c.label === q.correctChoice),
-        q.id,
-      );
+      if ((q.answerMode ?? "single") === "multiple") {
+        assert.equal(q.correctChoice, null, q.id);
+        assert.ok(
+          q.correctChoices &&
+            q.correctChoices.length > 0 &&
+            new Set(q.correctChoices).size === q.correctChoices.length &&
+            q.correctChoices.every((label) =>
+              q.choices.some((choice) => choice.label === label),
+            ),
+          q.id,
+        );
+      } else {
+        assert.ok(
+          q.choices.some((c) => c.label === q.correctChoice),
+          q.id,
+        );
+      }
       assert.ok(
         ["ABCD", "ABCDE"].includes(q.choices.map((c) => c.label).join("")),
         q.id,
       );
-      assert.ok(
-        q.sources.some((s) => s.answerPages?.length),
-        q.id,
-      );
+      if (q.sources.some((source) => source.kind === "notion")) {
+        assert.ok(
+          q.sources.some((source) => source.locator && source.url),
+          q.id,
+        );
+      } else {
+        assert.ok(
+          q.sources.some((s) => s.answerPages?.length),
+          q.id,
+        );
+      }
       assert.equal(reviews.has(q.id), false, q.id);
     } else {
       assert.ok(q.issues.length > 0 && reviews.has(q.id), q.id);

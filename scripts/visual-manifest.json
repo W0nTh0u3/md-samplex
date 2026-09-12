@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "description": "Opt-in manifest for locally stored, hash-verified clinical visuals and reviewed answer-mode overrides.",
+  "assets": [],
+  "questions": [],
+  "sharedCases": []
+}

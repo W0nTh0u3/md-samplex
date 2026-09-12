@@ -12,6 +12,7 @@ import {
   Stethoscope,
   Target,
 } from "lucide-react";
+import { countAnswered } from "@/lib/answers";
 import { MODES, type Attempt, type SubjectStats } from "@/lib/types";
 import { cx } from "./component-utils";
 import type { Dashboard, Tab, User } from "./study-types";
@@ -154,13 +155,13 @@ export function StudyDashboard({
             <h2>
               {active.length
                 ? dashboard.subjects.find(
-                  (subject) => subject.id === active[0].subject,
-                )?.name
+                    (subject) => subject.id === active[0].subject,
+                  )?.name
                 : "Small sessions. Lasting understanding."}
             </h2>
             <p>
               {active.length
-                ? `${Object.keys(active[0].answers).length} of ${active[0].questionIds.length} answered · ${MODES[active[0].mode].label}`
+                ? `${countAnswered(active[0].answers)} of ${active[0].questionIds.length} answered · ${MODES[active[0].mode].label}`
                 : "Choose a subject, find your pace, and give your next 25 questions your full attention."}
             </p>
             <button

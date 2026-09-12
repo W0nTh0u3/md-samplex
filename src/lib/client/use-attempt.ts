@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tick } from "../engine";
+import { normalizeAnswersForQuestions } from "../answers";
 import type { AttemptView, Draft, Edits } from "../types";
 import { api, getEditor, HttpError } from "./api";
 import {
@@ -28,6 +29,19 @@ export function useAttempt(id: string, ownerId: string) {
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const alive = useRef(true);
 
+  const normalizeView = useCallback((candidate: AttemptView): AttemptView => {
+    return {
+      ...candidate,
+      attempt: {
+        ...candidate.attempt,
+        answers: normalizeAnswersForQuestions(
+          candidate.attempt.answers,
+          candidate.questions,
+        ),
+      },
+    };
+  }, []);
+
   const persist = useCallback(async (draft: Draft) => {
     try {
       await saveDraft(draft);
@@ -40,14 +54,18 @@ export function useAttempt(id: string, ownerId: string) {
 
   const display = useCallback(
     (draft: Draft) => {
-      current.current = draft;
+      const normalizedDraft = {
+        ...draft,
+        view: normalizeView(draft.view),
+      };
+      current.current = normalizedDraft;
       if (alive.current) {
-        setView(draft.view);
-        setPendingSubmission(draft.pendingAction === "submit");
+        setView(normalizedDraft.view);
+        setPendingSubmission(normalizedDraft.pendingAction === "submit");
       }
-      void persist(draft);
+      void persist(normalizedDraft);
     },
-    [persist],
+    [normalizeView, persist],
   );
 
   const checkpoint = useCallback(() => {

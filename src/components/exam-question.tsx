@@ -11,9 +11,17 @@ import {
   Play,
   RotateCcw,
 } from "lucide-react";
+import {
+  answerLabels,
+  answerMode,
+  countAnswered,
+  feedbackCorrectLabels,
+  hasAnswer,
+} from "@/lib/answers";
 import type { Attempt, PublicQuestion } from "@/lib/types";
 import { cx, formatTime } from "./component-utils";
 import { ExamFeedback } from "./exam-feedback";
+import { ExamVisuals } from "./exam-visuals";
 import type { EditAttempt, SyncAction } from "./study-types";
 import styles from "./exam-question.module.scss";
 
@@ -62,10 +70,34 @@ export function ExamQuestion({
 }: ExamQuestionProps) {
   const questionHeading = useRef<HTMLHeadingElement>(null);
   const paused = attempt.status !== "running";
-  const answered = Object.keys(attempt.answers).length;
+  const answered = countAnswered(attempt.answers);
   const locked = attempt.checked.includes(question.id);
   const selected = attempt.answers[question.id];
+  const selectedLabels = answerLabels(selected);
+  const multiple = answerMode(question) === "multiple";
+  const correctLabels = question.feedback
+    ? feedbackCorrectLabels(question.feedback)
+    : [];
   const flagged = attempt.flags.includes(question.id);
+
+  function choose(label: string, checked = true) {
+    if (multiple) {
+      const next = checked
+        ? [...new Set([...selectedLabels, label])]
+        : selectedLabels.filter((value) => value !== label);
+      const answers = { ...attempt.answers };
+      if (next.length) answers[question.id] = next;
+      else delete answers[question.id];
+      onEdit({ answers });
+      return;
+    }
+    onEdit({
+      answers: {
+        ...attempt.answers,
+        [question.id]: label,
+      },
+    });
+  }
 
   useEffect(() => {
     questionHeading.current?.focus();
@@ -177,6 +209,18 @@ export function ExamQuestion({
             <aside className={styles.sharedCase}>
               <strong>Clinical case</strong>
               <p>{question.sharedCase.text}</p>
+              <ExamVisuals
+                visuals={question.sharedCase.visuals}
+                visibility="question"
+                className={styles.caseVisuals}
+              />
+              {question.feedback && (
+                <ExamVisuals
+                  visuals={question.sharedCase.visuals}
+                  visibility="feedback"
+                  className={styles.caseFeedbackVisuals}
+                />
+              )}
             </aside>
           )}
           <h1
@@ -186,47 +230,53 @@ export function ExamQuestion({
           >
             {question.stem}
           </h1>
+          <ExamVisuals visuals={question.visuals} visibility="question" />
           <fieldset
             className={cx(styles.choices, "choices")}
             disabled={locked || busy}
           >
-            <legend className="sr-only">Choose an answer</legend>
-            {question.choices.map((choice) => (
-              <label
-                key={choice.label}
-                className={cx(
-                  styles.choice,
-                  "choice",
-                  selected === choice.label && styles.selected,
-                  question.feedback &&
-                    choice.label === question.feedback.correctChoice &&
-                    styles.correct,
-                  question.feedback &&
-                    selected === choice.label &&
-                    selected !== question.feedback.correctChoice &&
-                    styles.incorrect,
-                )}
-              >
-                <input
-                  type="radio"
-                  name={`answer-${question.id}`}
-                  value={choice.label}
-                  checked={selected === choice.label}
-                  onChange={() =>
-                    onEdit({
-                      answers: {
-                        ...attempt.answers,
-                        [question.id]: choice.label,
-                      },
-                    })
-                  }
-                />
-                <span className={styles.choiceLabel}>{choice.label}</span>
-                <span className={styles.choiceText}>{choice.text}</span>
-                {selected === choice.label && <Check size={18} />}
-              </label>
-            ))}
+            <legend>{multiple ? "Select all that apply" : "Choose one"}</legend>
+            {question.choices.map((choice) => {
+              const isSelected = selectedLabels.includes(choice.label);
+              const isCorrect = correctLabels.includes(choice.label);
+              return (
+                <label
+                  key={choice.label}
+                  className={cx(
+                    styles.choice,
+                    "choice",
+                    isSelected && styles.selected,
+                    question.feedback && isCorrect && styles.correct,
+                    question.feedback &&
+                      isSelected &&
+                      !isCorrect &&
+                      styles.incorrect,
+                  )}
+                >
+                  <input
+                    type={multiple ? "checkbox" : "radio"}
+                    name={`answer-${question.id}`}
+                    value={choice.label}
+                    checked={isSelected}
+                    onChange={(event) =>
+                      choose(choice.label, event.currentTarget.checked)
+                    }
+                  />
+                  <span className={styles.choiceLabel}>{choice.label}</span>
+                  <span className={styles.choiceText}>{choice.text}</span>
+                  {isSelected && <Check size={18} />}
+                </label>
+              );
+            })}
           </fieldset>
+          <p
+            className={styles.answerInstruction}
+            data-testid="answer-instruction"
+          >
+            {multiple
+              ? "Select every option supported by the source."
+              : "Select the single best answer."}
+          </p>
           {attempt.mode === "practice" && !locked && (
             <div className={styles.checkRow}>
               <span>
@@ -235,7 +285,7 @@ export function ExamQuestion({
               </span>
               <button
                 className="primary"
-                disabled={!selected || busy}
+                disabled={!hasAnswer(selected) || busy}
                 onClick={() => {
                   onChecked(question.id);
                   void onSync("check", question.id);

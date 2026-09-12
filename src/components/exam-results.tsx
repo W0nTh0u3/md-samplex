@@ -8,9 +8,16 @@ import {
   Clock3,
   Flag,
 } from "lucide-react";
+import {
+  answerLabels,
+  countAnswered,
+  feedbackAnswerIsCorrect,
+  feedbackCorrectLabels,
+} from "@/lib/answers";
 import { MODES, SUBJECTS, type AttemptView } from "@/lib/types";
 import { cx, formatTime } from "./component-utils";
 import { ExamFeedback } from "./exam-feedback";
+import { ExamVisuals } from "./exam-visuals";
 import questionStyles from "./exam-question.module.scss";
 import shellStyles from "./exam.module.scss";
 import styles from "./exam-results.module.scss";
@@ -25,14 +32,18 @@ export function ExamResults({ view, leave }: ExamResultsProps) {
   const attempt = view.attempt;
   const correct = attempt.score ?? 0;
   const unanswered =
-    attempt.questionIds.length - Object.keys(attempt.answers).length;
+    attempt.questionIds.length - countAnswered(attempt.answers);
   const incorrect = attempt.questionIds.length - correct - unanswered;
   const percentage = Math.round((correct / attempt.questionIds.length) * 100);
   const questions = view.questions.filter(
     (question) =>
       filter === "all" ||
       (filter === "mistakes" &&
-        attempt.answers[question.id] !== question.feedback?.correctChoice) ||
+        (!question.feedback ||
+          !feedbackAnswerIsCorrect(
+            question.feedback,
+            attempt.answers[question.id],
+          ))) ||
       (filter === "flagged" && attempt.flags.includes(question.id)),
   );
 
@@ -140,33 +151,40 @@ export function ExamResults({ view, leave }: ExamResultsProps) {
               )}
             </div>
             {question.sharedCase && (
-              <p className={questionStyles.sharedCase}>
-                {question.sharedCase.text}
-              </p>
+              <div className={questionStyles.sharedCase}>
+                <strong>Clinical case</strong>
+                <p>{question.sharedCase.text}</p>
+                <ExamVisuals visuals={question.sharedCase.visuals} />
+              </div>
             )}
             <h3>{question.stem}</h3>
+            <ExamVisuals visuals={question.visuals} visibility="question" />
             <div className={styles.resultChoices}>
-              {question.choices.map((choice) => (
-                <div
-                  key={choice.label}
-                  className={cx(
-                    choice.label === question.feedback?.correctChoice
-                      ? styles.successText
-                      : attempt.answers[question.id] === choice.label
-                        ? styles.errorText
-                        : undefined,
-                  )}
-                >
-                  <b>{choice.label}</b>
-                  <span>{choice.text}</span>
-                  {attempt.answers[question.id] === choice.label && (
-                    <small>Your answer</small>
-                  )}
-                  {choice.label === question.feedback?.correctChoice && (
-                    <Check size={17} />
-                  )}
-                </div>
-              ))}
+              {question.choices.map((choice) => {
+                const selected = answerLabels(attempt.answers[question.id]);
+                const keyed = question.feedback
+                  ? feedbackCorrectLabels(question.feedback)
+                  : [];
+                const isSelected = selected.includes(choice.label);
+                const isCorrect = keyed.includes(choice.label);
+                return (
+                  <div
+                    key={choice.label}
+                    className={cx(
+                      isCorrect
+                        ? styles.successText
+                        : isSelected
+                          ? styles.errorText
+                          : undefined,
+                    )}
+                  >
+                    <b>{choice.label}</b>
+                    <span>{choice.text}</span>
+                    {isSelected && <small>Your answer</small>}
+                    {isCorrect && <Check size={17} />}
+                  </div>
+                );
+              })}
             </div>
             <ExamFeedback
               question={question}

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
+import { countAnswered, isValidAnswer, normalizeAnswer } from "@/lib/answers";
 import { useAttempt } from "@/lib/client/use-attempt";
 import { MODES, SUBJECTS } from "@/lib/types";
 import { Modal } from "./modal";
@@ -73,7 +74,7 @@ export function Exam({
   const attempt = view.attempt;
   const question = view.questions[attempt.position];
   const paused = attempt.status !== "running";
-  const answered = Object.keys(attempt.answers).length;
+  const answered = countAnswered(attempt.answers);
   const subject = SUBJECTS.find((item) => item.id === attempt.subject)?.name;
   const navigate = (position: number) => {
     edit({ position });
@@ -167,18 +168,28 @@ export function Exam({
           close={() => setShowRecovery(false)}
           restore={(draft) => {
             const answers = { ...attempt.answers };
-            for (const [questionId, answer] of Object.entries(
-              draft.view.attempt.answers,
-            ))
+            const questions = new Map(
+              view.questions.map((item) => [item.id, item]),
+            );
+            const answerIds = new Set([
+              ...Object.keys(attempt.answers),
+              ...Object.keys(draft.view.attempt.answers),
+            ]);
+            for (const questionId of answerIds) {
+              if (attempt.checked.includes(questionId)) continue;
+              const question = questions.get(questionId);
+              const answer = draft.view.attempt.answers[questionId];
+              const normalized = question
+                ? normalizeAnswer(question, answer)
+                : undefined;
               if (
-                !attempt.checked.includes(questionId) &&
-                view.questions.some(
-                  (item) =>
-                    item.id === questionId &&
-                    item.choices.some((choice) => choice.label === answer),
-                )
+                question &&
+                normalized !== undefined &&
+                isValidAnswer(question, normalized)
               )
-                answers[questionId] = answer;
+                answers[questionId] = normalized;
+              else delete answers[questionId];
+            }
             const remainingMs =
               attempt.remainingMs === null
                 ? null

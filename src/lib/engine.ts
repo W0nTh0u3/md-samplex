@@ -1,4 +1,12 @@
 import {
+  answerIsCorrect,
+  answerMode,
+  answerSetsEqual,
+  hasAnswer,
+  isValidAnswer,
+  normalizeAnswer,
+} from "./answers";
+import {
   MODES,
   type Attempt,
   type AttemptView,
@@ -107,27 +115,127 @@ export function questionsFor(attempt: Attempt, bank: Question[]): Question[] {
   const index = new Map(bank.map((q) => [q.id, q]));
   return attempt.questionIds.map((id) => {
     const q = index.get(id);
-    if (!q || q.status !== "validated" || !q.correctChoice)
+    if (!q || q.status !== "validated")
+      throw new AppError("The saved question bank is unavailable.", 503);
+    const labels = new Set(q.choices.map((choice) => choice.label));
+    const mode = answerMode(q);
+    const validLabels =
+      mode === "multiple"
+        ? (q.correctChoices ?? [])
+        : q.correctChoice
+          ? [q.correctChoice]
+          : [];
+    if (
+      (mode !== "single" && mode !== "multiple") ||
+      labels.size !== q.choices.length ||
+      q.choices.some((choice) => !/^[A-E]$/.test(choice.label)) ||
+      validLabels.length === 0 ||
+      new Set(validLabels).size !== validLabels.length ||
+      validLabels.some((label) => !labels.has(label)) ||
+      (mode === "single" && q.correctChoice === null) ||
+      (mode === "single" && q.correctChoices !== undefined) ||
+      (mode === "multiple" && q.correctChoice !== null)
+    )
       throw new AppError("The saved question bank is unavailable.", 503);
     return q;
   });
 }
 
+function validateAnswerMap(answers: Attempt["answers"], questions: Question[]) {
+  const questionIndex = new Map(
+    questions.map((question) => [question.id, question]),
+  );
+  for (const [id, answer] of Object.entries(answers)) {
+    const question = questionIndex.get(id);
+    if (!question) throw new AppError("An answer does not match this session.");
+    if (!isValidAnswer(question, answer)) {
+      if (answerMode(question) === "multiple")
+        throw new AppError(
+          "Multiple-response answers must be a non-empty array of unique choices.",
+        );
+      throw new AppError(
+        "Single-answer questions require exactly one valid choice.",
+      );
+    }
+  }
+}
+
+/**
+ * Saved attempts before multiple-response support contain string answers. Keep
+ * those attempts readable while normalizing the representation at the engine
+ * boundary. New multiple-response edits still have to use an array and are
+ * validated by applyEdits.
+ */
+export function normalizeAttemptAnswers(
+  attempt: Attempt,
+  bank: Question[],
+): Attempt {
+  const index = new Map(bank.map((q) => [q.id, q]));
+  let changed = false;
+  const answers = Object.fromEntries(
+    Object.entries(attempt.answers).map(([id, answer]) => {
+      const question = index.get(id);
+      const normalized = question
+        ? (normalizeAnswer(question, answer) ?? answer)
+        : answer;
+      if (normalized !== answer) changed = true;
+      return [id, normalized];
+    }),
+  );
+  return changed ? { ...attempt, answers } : attempt;
+}
+
+function publicVisuals(visuals: Question["visuals"], revealFeedback: boolean) {
+  const visible = visuals?.filter(
+    (visual) => revealFeedback || visual.visibility === "question",
+  );
+  return visible?.length ? visible : undefined;
+}
+
 export function publicView(attempt: Attempt, bank: Question[]): AttemptView {
+  const normalized = normalizeAttemptAnswers(attempt, bank);
   return {
-    attempt,
-    questions: questionsFor(attempt, bank).map((q) => ({
+    attempt: normalized,
+    questions: questionsFor(normalized, bank).map((q) => ({
       id: q.id,
       stem: q.stem,
       choices: q.choices,
       originalNumber: q.originalNumber,
-      sharedCase: q.sharedCase,
-      figures: q.figures,
-      ...(attempt.status === "submitted" || attempt.checked.includes(q.id)
+      answerMode: answerMode(q),
+      sharedCase: q.sharedCase
+        ? {
+            ...q.sharedCase,
+            visuals: publicVisuals(
+              q.sharedCase.visuals,
+              normalized.status === "submitted" ||
+                normalized.checked.includes(q.id),
+            ),
+          }
+        : undefined,
+      visuals: publicVisuals(
+        q.visuals,
+        normalized.status === "submitted" || normalized.checked.includes(q.id),
+      ),
+      ...(normalized.status === "submitted" || normalized.checked.includes(q.id)
         ? {
             feedback: {
-              correctChoice: q.correctChoice!,
-              explanation: q.explanation,
+              answerMode: answerMode(q),
+              correctChoice: q.correctChoice,
+              ...(answerMode(q) === "multiple"
+                ? { correctChoices: q.correctChoices }
+                : {}),
+              explanation:
+                q.explanation ||
+                (q.correctChoice
+                  ? q.choiceRationales?.[q.correctChoice]
+                  : q.correctChoices
+                      ?.map((label) => q.choiceRationales?.[label])
+                      .filter(Boolean)
+                      .join(" ")) ||
+                "",
+              ...(q.choiceRationales
+                ? { choiceRationales: q.choiceRationales }
+                : {}),
               sources: q.sources,
             },
           }
@@ -141,24 +249,21 @@ export function applyEdits(
   edits: Edits,
   bank: Question[],
 ): Attempt {
-  if (attempt.status === "submitted")
+  const normalizedAttempt = normalizeAttemptAnswers(attempt, bank);
+  if (normalizedAttempt.status === "submitted")
     throw new AppError("This session has already been submitted.", 409);
   if (!["running", "paused"].includes(edits.status))
     throw new AppError("Use the submit operation to finish.");
-  const qs = questionsFor(attempt, bank);
-  if (
-    Object.keys(edits.answers).some(
-      (id) =>
-        !qs.some(
-          (q) =>
-            q.id === id && q.choices.some((c) => c.label === edits.answers[id]),
-        ),
+  const qs = questionsFor(normalizedAttempt, bank);
+  validateAnswerMap(edits.answers, qs);
+  for (const id of normalizedAttempt.checked) {
+    if (
+      !(id in edits.answers) ||
+      !answerSetsEqual(edits.answers[id], normalizedAttempt.answers[id])
     )
-  )
-    throw new AppError("An answer does not match this session.");
-  if (attempt.checked.some((id) => edits.answers[id] !== attempt.answers[id]))
-    throw new AppError("Checked practice answers are locked.");
-  if (edits.flags.some((id) => !attempt.questionIds.includes(id)))
+      throw new AppError("Checked practice answers are locked.");
+  }
+  if (edits.flags.some((id) => !normalizedAttempt.questionIds.includes(id)))
     throw new AppError("Invalid review flag.");
   if (
     !Number.isInteger(edits.position) ||
@@ -166,9 +271,12 @@ export function applyEdits(
     edits.position >= qs.length
   )
     throw new AppError("Invalid question position.");
-  if (!Number.isFinite(edits.elapsedMs) || edits.elapsedMs < attempt.elapsedMs)
+  if (
+    !Number.isFinite(edits.elapsedMs) ||
+    edits.elapsedMs < normalizedAttempt.elapsedMs
+  )
     throw new AppError("Active time cannot move backwards.");
-  if (attempt.remainingMs === null) {
+  if (normalizedAttempt.remainingMs === null) {
     if (edits.remainingMs !== null)
       throw new AppError("Practice sessions are untimed.");
   } else {
@@ -176,25 +284,32 @@ export function applyEdits(
       edits.remainingMs === null ||
       !Number.isFinite(edits.remainingMs) ||
       edits.remainingMs < 0 ||
-      edits.remainingMs > attempt.remainingMs
+      edits.remainingMs > normalizedAttempt.remainingMs
     )
       throw new AppError("The timer cannot be extended.");
     if (
       Math.abs(
         edits.elapsedMs +
           edits.remainingMs -
-          duration(attempt.mode, qs.length)!,
+          duration(normalizedAttempt.mode, qs.length)!,
       ) > 5
     )
       throw new AppError("Timer checkpoint is inconsistent.");
   }
-  return { ...attempt, ...edits, flags: [...new Set(edits.flags)] };
+  return {
+    ...normalizedAttempt,
+    ...edits,
+    flags: [...new Set(edits.flags)],
+  };
 }
 
 export function checkAnswer(attempt: Attempt, questionId: string): Attempt {
   if (attempt.status === "submitted" || attempt.mode !== "practice")
     throw new AppError("Feedback is only available during practice.");
-  if (!attempt.questionIds.includes(questionId) || !attempt.answers[questionId])
+  if (
+    !attempt.questionIds.includes(questionId) ||
+    !hasAnswer(attempt.answers[questionId])
+  )
     throw new AppError("Choose an answer first.");
   if (attempt.checked.includes(questionId)) return attempt;
   return {
@@ -205,11 +320,14 @@ export function checkAnswer(attempt: Attempt, questionId: string): Attempt {
 
 export function submitAttempt(attempt: Attempt, bank: Question[]): Attempt {
   if (attempt.status === "submitted") return attempt;
-  const score = questionsFor(attempt, bank).filter(
-    (q) => attempt.answers[q.id] === q.correctChoice,
+  const normalized = normalizeAttemptAnswers(attempt, bank);
+  const questions = questionsFor(normalized, bank);
+  validateAnswerMap(normalized.answers, questions);
+  const score = questions.filter((q) =>
+    answerIsCorrect(q, normalized.answers[q.id]),
   ).length;
   return {
-    ...attempt,
+    ...normalized,
     status: "submitted",
     score,
     submittedAt: new Date().toISOString(),

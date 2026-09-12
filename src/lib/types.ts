@@ -29,10 +29,35 @@ export const SUBJECTS = [
   },
 ] as const;
 export type SubjectId = (typeof SUBJECTS)[number]["id"];
+export type AnswerMode = "single" | "multiple";
+export type Answer = string | string[];
+export type SourceMetadata = Record<string, string | boolean>;
 export type SourceRef = {
   filename: string;
   pages: number[];
   answerPages?: number[];
+  kind?: "pdf" | "notion";
+  locator?: string;
+  title?: string;
+  url?: string;
+  metadata?: SourceMetadata;
+};
+export type VisualKind = "image" | "table" | "diagram";
+export type VisualVisibility = "question" | "feedback";
+export type VisualRef = {
+  id: string;
+  path: string;
+  sha256: string;
+  kind: VisualKind;
+  alt: string;
+  caption?: string;
+  visibility: VisualVisibility;
+  sourceLocator?: string;
+};
+export type SharedCase = {
+  id: string;
+  text: string;
+  visuals?: VisualRef[];
 };
 export type Question = {
   id: string;
@@ -40,13 +65,17 @@ export type Question = {
   originalNumber: number;
   stem: string;
   choices: { label: string; text: string }[];
+  /** Omitted on historical records; treat omission as `single`. */
+  answerMode?: AnswerMode;
   correctChoice: string | null;
+  correctChoices?: string[];
   explanation: string;
+  choiceRationales?: Record<string, string>;
   sources: SourceRef[];
   status: "validated" | "needs_review";
   issues: string[];
-  sharedCase?: { id: string; text: string };
-  figures?: string[];
+  sharedCase?: SharedCase;
+  visuals?: VisualRef[];
 };
 export type Mode = "practice" | "ple" | "topnotch";
 export const MODES: Record<
@@ -76,7 +105,7 @@ export type Attempt = {
   subject: SubjectId;
   mode: Mode;
   questionIds: string[];
-  answers: Record<string, string>;
+  answers: Record<string, Answer>;
   checked: string[];
   flags: string[];
   position: number;
@@ -91,14 +120,18 @@ export type Attempt = {
   score?: number;
 };
 export type Feedback = {
-  correctChoice: string;
+  /** Omitted on historical feedback objects; treat omission as `single`. */
+  answerMode?: AnswerMode;
+  correctChoice: string | null;
+  correctChoices?: string[];
   explanation: string;
+  choiceRationales?: Record<string, string>;
   sources: SourceRef[];
 };
 export type PublicQuestion = Pick<
   Question,
-  "id" | "stem" | "choices" | "originalNumber" | "sharedCase" | "figures"
-> & { feedback?: Feedback };
+  "id" | "stem" | "choices" | "originalNumber" | "sharedCase" | "visuals"
+> & { answerMode?: AnswerMode; feedback?: Feedback };
 export type AttemptView = { attempt: Attempt; questions: PublicQuestion[] };
 export type Draft = {
   ownerId: string;
