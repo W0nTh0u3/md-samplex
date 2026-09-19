@@ -18,7 +18,7 @@ test("complete bank has unique IDs, valid source keys, original options and expl
   assert.equal(
     report.files.filter((file: { kind?: string }) => file.kind !== "notion")
       .length,
-    9,
+    10,
   );
   assert.equal(
     report.files.filter((file: { kind?: string }) => file.kind === "notion")
@@ -33,15 +33,17 @@ test("complete bank has unique IDs, valid source keys, original options and expl
   const notionQuestions = questions.filter((q) =>
     q.sources.some((source) => source.kind === "notion"),
   );
-  // All 8,400 Superexam and 150 Avillo source numbers are accounted for,
-  // including records consolidated at different original numbers. Notion
-  // records have independent locators and are counted in their own inventory.
+  // All 8,400 SuperExam and 150 Avillo source numbers are accounted for,
+  // including records consolidated at different original numbers. MEDQBANK
+  // contributes all 1,199 source-order records. Notion records have
+  // independent locators and are counted in their own inventory.
+  assert.equal(report.medqbank.records, 1199);
   assert.equal(
     pdfQuestions.length +
       report.duplicates.filter(
         (d: { method: string }) => d.method === "identical_content",
       ).length,
-    8550,
+    8550 + report.medqbank.records,
   );
   assert.equal(notionQuestions.length, report.notion[0].records);
   const reviews = new Set(report.review.map((q: Question) => q.id));

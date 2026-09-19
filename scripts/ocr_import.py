@@ -49,7 +49,11 @@ SECTION_RANGES: tuple[tuple[str, int, int], ...] = (
 )
 
 QUESTION_RE = re.compile(
-    r"^\s*[^A-Za-z0-9]{0,4}(?P<number>\d{1,3})\s*[.)]\s+(?P<text>.+)$"
+    # Commas are a common scan substitution for the source period (for
+    # example, ``44, Which ...``).  Keep this permissive only for OCR
+    # candidates; every resulting record remains needs_review.
+    r"^\s*[^A-Za-z0-9]{0,4}(?P<number>\d{1,3})\s*"
+    r"(?P<separator>[.),])\s+(?P<text>.+)$"
 )
 OPTION_MARKER_RE = re.compile(
     r"(?<![A-Za-z0-9])(?P<label>[A-Ea-e0])\s*[.)>:,]\s*"
@@ -125,6 +129,8 @@ def _page_lines(page_rows: dict[int, dict[str, Any]], start: int, end: int) -> l
                         "rightText": right_text,
                         "fullText": full_text,
                         "words": layout_line.get("words", []),
+                        "columnSplitX": layout.get("columnSplitX"),
+                        "ocr": row.get("ocr"),
                         "layout": True,
                     }
                 )
@@ -138,6 +144,7 @@ def _page_lines(page_rows: dict[int, dict[str, Any]], start: int, end: int) -> l
                     "leftText": text,
                     "rightText": "",
                     "fullText": text,
+                    "ocr": row.get("ocr"),
                     "layout": False,
                 }
             )
@@ -184,6 +191,7 @@ def _question_candidates(
                 "page": item["page"],
                 "line": item["line"],
                 "rawNumber": number,
+                "separator": match.group("separator"),
                 "text": text,
             }
         )
@@ -344,7 +352,12 @@ def _is_layout_noise_line(line: dict[str, Any]) -> bool:
     if not line.get("layout"):
         return False
     tokens = line.get("text", "").split()
-    words = [word for word in line.get("words", []) if word.get("left", 0) < 1130]
+    split_x = line.get("columnSplitX")
+    if not isinstance(split_x, (int, float)):
+        split_x = 1130
+    words = [
+        word for word in line.get("words", []) if word.get("left", 0) < split_x
+    ]
     if len(tokens) != 1 or len(tokens[0]) > 3 or not tokens[0].isalpha():
         return False
     confidences = [
@@ -371,7 +384,7 @@ def _remove_question_prefix(text: str, number: int) -> str:
         return match.group("text")
     # A placeholder/mismatch still retains the raw line if OCR punctuation was
     # too damaged for QUESTION_RE.
-    return re.sub(rf"^\s*[^A-Za-z0-9]{{0,4}}{number}\s*[.)]\s*", "", text)
+    return re.sub(rf"^\s*[^A-Za-z0-9]{{0,4}}{number}\s*[.),]\s*", "", text)
 
 
 def _question_prefix_end(text: str) -> int:
@@ -608,6 +621,28 @@ def _block_lines(
     return all_lines[start_index:end]
 
 
+def _ocr_configuration_groups(
+    lines: list[dict[str, Any]], source: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Keep page-level OCR overrides alongside report-level defaults."""
+
+    groups: dict[str, dict[str, Any]] = {}
+    for line in lines:
+        config = line.get("ocr")
+        if not isinstance(config, dict):
+            config = source["ocr"]
+        key = json.dumps(config, sort_keys=True, default=str)
+        group = groups.setdefault(key, {"pages": set(), "config": config})
+        group["pages"].add(line["page"])
+    return sorted(
+        (
+            {"pages": sorted(group["pages"]), "config": group["config"]}
+            for group in groups.values()
+        ),
+        key=lambda group: group["pages"][0],
+    )
+
+
 def _record_from_block(
     *,
     subject: str,
@@ -629,6 +664,12 @@ def _record_from_block(
     stem = _extract_stem(lines, number, option_start, answer)
     explanation = _extract_explanation(lines, answer, option_start, choices)
     pages = sorted({item["page"] for item in lines})
+    ocr_configurations = _ocr_configuration_groups(lines, source)
+    primary_ocr = (
+        ocr_configurations[0]["config"]
+        if ocr_configurations
+        else source["ocr"]
+    )
     issues = {
         "ocr_text_requires_manual_review",
         "answer_highlight_requires_manual_review",
@@ -638,6 +679,8 @@ def _record_from_block(
     }
     if start.get("numberMismatch"):
         issues.add("ocr_question_number_requires_manual_review")
+    if start.get("separator") == ",":
+        issues.add("ocr_question_boundary_requires_manual_review")
     if len(pages) > 1:
         issues.add("cross_page_record_requires_manual_review")
     if not answer:
@@ -695,13 +738,17 @@ def _record_from_block(
         "locator": f"PDF pages {first_page}-{last_page} / Question {number}",
         "metadata": {
             "sourceSha256": source["sha256"],
-            "ocrEngine": source["ocr"]["engine"],
-            "ocrVersion": source["ocr"]["version"],
-            "ocrLanguage": source["ocr"]["language"],
-            "ocrDpi": str(source["ocr"]["dpi"]),
-            "ocrPsm": str(source["ocr"]["psm"]),
-            "ocrLayout": str(source["ocr"].get("layout", "plain-text")),
-            "ocrColumnSplitX": str(source["ocr"].get("columnSplitX", "")),
+            "ocrEngine": primary_ocr["engine"],
+            "ocrVersion": primary_ocr["version"],
+            "ocrLanguage": primary_ocr["language"],
+            "ocrDpi": str(primary_ocr["dpi"]),
+            "ocrPsm": ",".join(
+                str(group["config"].get("psm", ""))
+                for group in ocr_configurations
+            ),
+            "ocrLayout": str(primary_ocr.get("layout", "plain-text")),
+            "ocrColumnSplitX": str(primary_ocr.get("columnSplitX", "")),
+            "ocrConfigurations": ocr_configurations,
         },
     }
     return {

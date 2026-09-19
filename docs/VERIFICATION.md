@@ -17,12 +17,15 @@ This file records verification of the locally runnable MVP. Live Google/Supabase
 | `npm run extract:notion-public` | Read-only public Notion snapshot; hydrates lazy rationale blocks, records API/source hashes, and emits review-only candidates without changing the canonical bank |
 | `.venv/bin/python scripts/ocr_pdf.py --layout ...` | Coordinate-aware OCR for representative or full scanned-PDF ranges with source hash, TSV word coordinates, column configuration, page references, and explicit `needs_review` output; it does not publish questions |
 | `npm run extract:ocr` | Review-only Q&A candidate generation from the full coordinate report; preserves raw OCR/source locators and keeps every candidate out of scored sessions |
+| `npm run review:ocr` | Source-PDF feedback-crop generation plus structural question/answer/page audit for every OCR slot; review-only and outside `public/assets` |
+
+The MEDQBANK importer fixtures additionally cover two-column extraction, unnumbered choice order, question options continuing onto another page, exact answer-text matching, missing/ambiguous/multiple-response keys, printed-date/page metadata, question-cell visual quarantine, feedback-only image hashes, duplicate image placements, and visual-only pages. The PDF report retains all 12 subject headings and printed dates, source pages, unresolved row issues, and unassigned visual locations.
 
 The database test executes the actual SQL migration in embedded PostgreSQL (PGlite), verifies owner-only reads and denied anonymous/client writes, and exercises compare-and-swap updates and payload consistency constraints. API ownership checks are additionally tested using two independent preview browser accounts.
 
 Playwright runs Chromium with a desktop viewport and a 375 × 812 mobile viewport. Tests use native keyboard radio selection, verify focus styling and horizontal bounds, and emulate reduced motion. Source and screen screenshots are kept as local artifacts under `.local/`; traces are retained on failure. Slow feedback is tested across a timer checkpoint, and disconnected recovery is tested with network access disabled through tab closure. A committed save with an intentionally dropped response verifies that stale-revision rejection leaves takeover and draft recovery usable.
 
-On this minimal Linux environment, Chromium needed NSPR/NSS/ALSA libraries. They were downloaded and extracted into `/tmp/ple-browser-libs` because system installation required an unavailable sudo password. A standard machine can use `npx playwright install --with-deps chromium`.
+On this minimal Linux environment, Chromium needs NSPR/NSS/ALSA libraries. The previously documented `/tmp/ple-browser-libs` bundle is not present in the current workspace. A standard machine can install the dependencies with `npx playwright install --with-deps chromium`.
 
 ## Remaining acceptance checks
 
@@ -30,21 +33,21 @@ On this minimal Linux environment, Chromium needed NSPR/NSS/ALSA libraries. They
 - **Real cloud/device testing:** apply the migration to the target Supabase project, sign in to the same account on two physical devices, save/restore, and test explicit takeover during interrupted network requests. Local browser/API tests do not substitute for this infrastructure acceptance.
 - **Physical crash/power loss:** tests cover refresh, disconnect and tab closure, not operating-system power loss. Recovery is bounded by completed IndexedDB/cloud checkpoints.
 - **Content adjudication:** the complete bank is structurally validated; the visual audit is representative. Every unresolved record remains excluded. Exhaustive manual review and independent clinical/legal currency validation are not claimed. See `CONTENT_REVIEW.md` and the versioned `report.json`.
-- **Browser breadth:** Chromium was exercised. Safari, Firefox, screen-reader combinations and physical mobile devices remain deployment acceptance checks.
+- **Browser breadth:** the current Chromium rerun could not launch its browser because `libnspr4.so` is unavailable; none of its browser assertions ran. Safari, Firefox, screen-reader combinations and physical mobile devices remain deployment acceptance checks.
 
 ## Final run
 
 - **PASS:** strict TypeScript checking and ESLint.
 - **PASS:** all 11 TypeScript engine, full-bank and embedded PostgreSQL tests, including exact-set multiple-response scoring, legacy answer normalization, and visual secrecy.
 - **PASS:** production build, including TypeScript, static page generation and dynamic API/auth routes. A transient TypeScript configuration-read failure on an earlier build did not recur; direct configuration parsing and the final build both passed.
-- **PASS:** all 10 Chromium scenarios against the rebuilt production build through an isolated local preview server on port 3100, using the local NSPR/NSS/ALSA browser-library workaround, including source disclosure, Notion rationale-compatible feedback, natural explanation wrapping, timing, recovery, and answer secrecy.
+- **BLOCKED (host dependency):** the production Playwright runner attempted all 10 scenarios, but Chromium could not launch because `libnspr4.so` is unavailable. No browser assertions ran.
 - **PASS:** style audit confirms no Sass `@import` rules, with Tailwind’s vendor import isolated in plain CSS.
-- **PENDING:** `npm run validate:bank` produced candidate content version `bank-a1a4636ada15767f` but it differs from the active immutable version `bank-4cc48d81759145d0` after the importer’s fail-closed conflict handling was tightened. No version was promoted: the visual manifest contains no newly verified assets or answer overrides, and existing bank versions must remain immutable. The enabled PDF sources account for all 8,550 source question numbers and the enabled Notion snapshot contributes 1,200 records; the active version has 9,717 unique records, with 7,590 eligible and 2,127 excluded.
+- **PASS:** added MEDQBANK as immutable version `bank-0fd86fe79530b433`; deterministic regeneration matches the published modules and report. The version contains 10,912 unique records, with 8,653 structurally validated and 2,259 excluded pending review. MEDQBANK contributes 1,199 source-order records across all 12 sections (99–101 per section; 1,076 eligible and 123 needs review), preserves the April 2025 Microbiology and Physiology dates, and supplies 242 hash-verified feedback-only visual assets. Five rows with unresolved options and 47 unattached visual locations remain in the source report. Previous bank versions remain present and unchanged.
 - **PASS:** sampled production client-bundle inspection across 26 JavaScript chunks found neither the sampled question text nor a secret-key environment-key reference. API tests separately verify feedback is withheld until allowed.
 - **PASS:** server feedback tests verify optional per-choice rationales and the correct-choice fallback remain absent before checking/submission and are revealed only at the existing feedback boundary.
-- **PASS:** 23 Python importer/OCR tests cover explicit multiple keys, verified and rejected visual manifests, local/public Notion formats, per-option rationales, explicit green answer highlighting, nested rationale bullets, metadata, duplicate content and fail-closed malformed records.
-- **PASS:** the scanned PLE PDF has a complete 435-page coordinate OCR report and a 1,200-record review-only Q&A candidate artifact (1,161 recoverable blocks and 39 explicit boundary placeholders); all remain quarantined.
+- **PASS:** all 30 Python importer/OCR/visual tests pass, including the MEDQBANK layout, continuation, answer-pairing, visual-quarantine, and hash fixtures.
+- **PASS:** the scanned PLE PDF has a complete 435-page coordinate OCR report and a 1,200-record review-only Q&A candidate artifact; the current importer recovers 1,168 blocks and leaves 32 explicit boundary placeholders against the historical PSM 6 report with the targeted page-7 hybrid, with all records still quarantined.
 - **PASS:** the public Notion API snapshot contains 12 subject pages and 1,200 records with hydrated per-option rationale text. The source stores its green answer highlight as Notion `teal_background` on the rationale block; the parser recovered 1,198 explicit single-answer keys, and the new bank admits 750 structurally clean Notion records while quarantining 450 with review issues.
-- **PENDING:** the scanned PLE PDF and the newly applied Notion records still require independent content adjudication and clinical/legal review before their source material can be treated as authoritative.
+- **PENDING:** the scanned PLE PDF, applied Notion records, and MEDQBANK records still require independent content adjudication and clinical/legal review before their source material can be treated as authoritative.
 
 The successful local checks do not close the live infrastructure, exhaustive content review, or browser/device acceptance items above.

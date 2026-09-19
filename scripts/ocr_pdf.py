@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ocr import (
     DEFAULT_COLUMN_SPLIT_X,
+    DEFAULT_PSM,
     DEFAULT_SAMPLE_RANGES,
     ocr_layout_sample,
     ocr_sample,
@@ -33,7 +34,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path(".local/ocr-report.json"))
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--language", default="eng")
-    parser.add_argument("--psm", type=int, default=6)
+    parser.add_argument("--psm", type=int, default=DEFAULT_PSM)
     parser.add_argument(
         "--layout",
         action="store_true",

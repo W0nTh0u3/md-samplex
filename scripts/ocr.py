@@ -22,6 +22,10 @@ DEFAULT_SAMPLE_RANGES = ((1, 10), (216, 225), (426, 435))
 # At 300 DPI the scanned source's question cell ends before this x coordinate
 # on the sampled pages. The answer key and explanation start to its right.
 DEFAULT_COLUMN_SPLIT_X = 1130
+# PSM 4 preserves the source's variable-height table rows more reliably than
+# PSM 6 on the scanned PLE pages. Callers can still select another Tesseract
+# segmentation mode when reviewing a different source.
+DEFAULT_PSM = 4
 
 
 def expand_page_ranges(
@@ -105,7 +109,7 @@ def ocr_page(
     *,
     dpi: int = 300,
     language: str = "eng",
-    psm: int = 6,
+    psm: int = DEFAULT_PSM,
     tesseract: str = "tesseract",
 ) -> str:
     """Render and OCR one 1-based page without trusting its PDF text layer."""
@@ -203,7 +207,7 @@ def ocr_page_layout(
     *,
     dpi: int = 300,
     language: str = "eng",
-    psm: int = 6,
+    psm: int = DEFAULT_PSM,
     tesseract: str = "tesseract",
     column_split_x: int = DEFAULT_COLUMN_SPLIT_X,
 ) -> dict[str, Any]:
@@ -232,7 +236,7 @@ def ocr_sample(
     *,
     dpi: int = 300,
     language: str = "eng",
-    psm: int = 6,
+    psm: int = DEFAULT_PSM,
     tesseract: str = "tesseract",
 ) -> dict:
     source_path = Path(path)
@@ -243,6 +247,13 @@ def ocr_sample(
         page_count = len(document)
         page_numbers = expand_page_ranges(range_list, page_count)
         version = tesseract_version(tesseract) if shutil.which(tesseract) else None
+        page_ocr = {
+            "engine": "tesseract",
+            "version": version,
+            "language": language,
+            "dpi": dpi,
+            "psm": psm,
+        }
         output = []
         for page_number in page_numbers:
             text = ocr_page(
@@ -257,6 +268,7 @@ def ocr_sample(
                 {
                     "page": page_number,
                     "text": text,
+                    "ocr": page_ocr.copy(),
                     "status": "needs_review",
                     "issues": [
                         "ocr_text_requires_manual_review",
@@ -290,7 +302,7 @@ def ocr_layout_sample(
     *,
     dpi: int = 300,
     language: str = "eng",
-    psm: int = 6,
+    psm: int = DEFAULT_PSM,
     tesseract: str = "tesseract",
     column_split_x: int = DEFAULT_COLUMN_SPLIT_X,
 ) -> dict[str, Any]:
@@ -303,6 +315,15 @@ def ocr_layout_sample(
         page_count = len(document)
         page_numbers = expand_page_ranges(range_list, page_count)
         version = tesseract_version(tesseract) if shutil.which(tesseract) else None
+        page_ocr = {
+            "engine": "tesseract",
+            "version": version,
+            "language": language,
+            "dpi": dpi,
+            "psm": psm,
+            "layout": "tsv",
+            "columnSplitX": column_split_x,
+        }
         output = []
         for page_number in page_numbers:
             page_result = ocr_page_layout(
@@ -319,6 +340,7 @@ def ocr_layout_sample(
                     "page": page_number,
                     "text": page_result["text"],
                     "layout": page_result["layout"],
+                    "ocr": page_ocr.copy(),
                     "status": "needs_review",
                     "issues": [
                         "ocr_text_requires_manual_review",

@@ -58,6 +58,12 @@
       "enabled": true
     },
     {
+      "path": "raw pdfs/MEDQBANK-OCTOBER2025.pdf",
+      "kind": "pdf",
+      "parser": "medqbank",
+      "enabled": true
+    },
+    {
       "path": "raw pdfs/821551629-Ple-Test-Bank-compressed.pdf",
       "kind": "pdf",
       "parser": "ocr-layout",
@@ -74,7 +80,7 @@
         ],
         "dpi": 300,
         "language": "eng",
-        "psm": 6,
+        "psm": 4,
         "layout": "tesseract-tsv",
         "columnSplitX": 1130
       }

@@ -16,6 +16,7 @@
     "extract:notion-public": ".venv/bin/python scripts/notion_public_import.py",
     "extract:ocr": ".venv/bin/python scripts/ocr_import.py .local/ocr-ple-layout-full.json --output .local/ocr-ple-qbank.json",
     "extract:ocr-layout": ".venv/bin/python scripts/ocr_pdf.py \"raw pdfs/821551629-Ple-Test-Bank-compressed.pdf\" --layout --pages 1-435 --output .local/ocr-ple-layout-full.json",
+    "review:ocr": ".venv/bin/python scripts/ocr_review.py",
     "validate:bank": ".venv/bin/python scripts/extract.py --check"
   },
   "dependencies": {

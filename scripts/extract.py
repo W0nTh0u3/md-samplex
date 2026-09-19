@@ -30,7 +30,21 @@ except ImportError:  # Running the canonical script directly from scripts/.
         subject_slug,
     )
 
+def repository_root():
+    root = Path(__file__).resolve().parents[1]
+    # The Windows-mounted workspace is case-insensitive; use its lowercase
+    # alias so sandboxed writes resolve under the configured writable root.
+    lowercase = Path(root.as_posix().lower())
+    try:
+        if lowercase.samefile(root):
+            return lowercase
+    except OSError:
+        pass
+    return root
+
+
 ROOT = Path(__file__).resolve().parents[1]
+WRITE_ROOT = repository_root()
 SUBJECTS = {
     'BIOCHEMISTRY': 'biochemistry', 'ANATOMY': 'anatomy',
     'MICROBIOLOGY': 'microbiology', 'PHYSIOLOGY': 'physiology',
@@ -160,9 +174,12 @@ def load_visual_manifest(path):
     manifest_path = Path(path)
     if not manifest_path.is_absolute():
         manifest_path = ROOT / manifest_path
+        display_path = WRITE_ROOT / Path(path)
+    else:
+        display_path = manifest_path
     if not manifest_path.exists():
         return {
-            'path': str(manifest_path),
+            'path': str(display_path),
             'assets': {},
             'questions': {},
             'sharedCases': {},
@@ -278,12 +295,66 @@ def load_visual_manifest(path):
     for case_id in duplicate_shared_cases:
         shared_cases.pop(case_id, None)
     return {
-        'path': str(manifest_path),
+        'path': str(display_path),
         'assets': assets,
         'questions': questions,
         'sharedCases': shared_cases,
         'errors': errors,
     }
+
+
+def merge_visual_manifests(*manifests):
+    """Combine independent verified-visual inventories without overwriting."""
+    present = [manifest for manifest in manifests if manifest]
+    merged = {
+        'path': '; '.join(manifest['path'] for manifest in present),
+        'assets': {},
+        'questions': {},
+        'sharedCases': {},
+        'errors': [],
+    }
+    for manifest in present:
+        merged['errors'].extend(manifest.get('errors', []))
+        for asset_id, asset in manifest.get('assets', {}).items():
+            if asset_id in merged['assets']:
+                merged['assets'][asset_id]['_valid'] = False
+                merged['errors'].append({
+                    'id': asset_id,
+                    'reason': ['duplicate_asset_id_across_manifests'],
+                })
+            else:
+                merged['assets'][asset_id] = asset
+        for question_id, entry in manifest.get('questions', {}).items():
+            if question_id not in merged['questions']:
+                merged['questions'][question_id] = entry
+                continue
+            prior = merged['questions'][question_id]
+            for key in ('visualIds', 'assetIds', 'requiredVisualIds', 'requiredAssetIds'):
+                values = [*_manifest_value_ids(prior.get(key, [])), *_manifest_value_ids(entry.get(key, []))]
+                if key in prior or key in entry:
+                    prior[key] = list(dict.fromkeys(values))
+            prior['verified'] = prior.get('verified') is True and entry.get('verified') is True
+            prior['answerKeyVerified'] = (
+                prior.get('answerKeyVerified') is True and entry.get('answerKeyVerified') is True
+            )
+            for key in ('answerMode', 'correctChoice', 'correctChoices'):
+                if key in entry and key not in prior:
+                    prior[key] = entry[key]
+                elif key in entry and key in prior and prior[key] != entry[key]:
+                    prior['verified'] = False
+                    merged['errors'].append({
+                        'id': question_id,
+                        'reason': ['conflicting_visual_manifest_answer_override'],
+                    })
+        for case_id, entry in manifest.get('sharedCases', {}).items():
+            if case_id in merged['sharedCases']:
+                merged['errors'].append({
+                    'id': case_id,
+                    'reason': ['duplicate_shared_case_across_manifests'],
+                })
+                continue
+            merged['sharedCases'][case_id] = entry
+    return merged
 
 
 def _manifest_asset_ids(entry):
@@ -969,6 +1040,7 @@ def main():
     _, enabled_sources, canonical_source = load_source_manifest(args.manifest)
     visual_manifest = load_visual_manifest(args.visual_manifest)
     inventory = {key: [] for key in ['unrecognizedPages', 'unparsedRows', 'unparsedPages', 'duplicates', 'conflicts', 'files']}
+    source_visual_manifests = []
     merged = canonical_source['_path']
     records, page_subjects = parse_merged(merged, inventory)
     doc = fitz.open(merged)
@@ -984,6 +1056,16 @@ def main():
         file_info = {'filename': path.name, 'sha256': hashlib.sha256(data).hexdigest(), 'pages': len(standalone)}
         inventory['files'].append(file_info)
         if path == merged:
+            continue
+        if source.get('parser') == 'medqbank':
+            try:
+                from .medqbank_import import parse_medqbank
+            except ImportError:  # Running the canonical script directly from scripts/.
+                from medqbank_import import parse_medqbank
+            medqbank_records, medqbank_report, medqbank_visual_path = parse_medqbank(path)
+            records.extend(medqbank_records)
+            inventory['medqbank'] = medqbank_report
+            source_visual_manifests.append(load_visual_manifest(medqbank_visual_path))
             continue
         if source.get('parser') == 'ocr-sample':
             inventory.setdefault('ocr', []).append({
@@ -1104,6 +1186,8 @@ def main():
                 'sha256': file_hash,
                 'reviewStatus': source.get('reviewStatus', notion_report['reviewStatus']),
             })
+    if source_visual_manifests:
+        visual_manifest = merge_visual_manifests(visual_manifest, *source_visual_manifests)
     for record in records:
         validate(record)
     # These two groups were checked visually against Avillo page 1. Other
@@ -1230,11 +1314,11 @@ def main():
     summary = {subject: {'total': sum(r['subject'] == subject for r in records), 'validated': sum(r['subject'] == subject and r['status'] == 'validated' for r in records)} for subject in SUBJECTS.values()}
     report = {'version': version, 'parser': 'PyMuPDF 1.26.7; structural validation, not clinical revalidation', 'summary': summary, 'total': len(records), 'validated': sum(r['status'] == 'validated' for r in records), 'needsReview': len(review), 'issues': dict(sorted(Counter(issue for r in records for issue in r['issues']).items())), **inventory, 'review': review}
     print(json.dumps({k: report[k] for k in ['version', 'summary', 'total', 'validated', 'needsReview', 'issues']}, indent=2), flush=True)
-    (ROOT/'.local').mkdir(exist_ok=True)
-    (ROOT/'.local/extraction.json').write_text(json.dumps({'records': records, 'report': report}, ensure_ascii=False), encoding='utf-8')
+    (WRITE_ROOT/'.local').mkdir(exist_ok=True)
+    (WRITE_ROOT/'.local/extraction.json').write_text(json.dumps({'records': records, 'report': report}, ensure_ascii=False), encoding='utf-8')
     if args.draft:
         return
-    destination = ROOT/'src/data/versions'/version
+    destination = WRITE_ROOT/'src/data/versions'/version
     files = {}
     for subject in SUBJECTS.values():
         rows = [r for r in records if r['subject'] == subject]
@@ -1260,9 +1344,9 @@ def main():
     entry += f'\nexport const BANK_VERSION = "{version}";\n'
     entry += 'export const BANKS = { ' + ', '.join(f'"{v}": v{i}' for i, v in enumerate(versions)) + ' };\n'
     entry += 'export const questionBank = BANKS[BANK_VERSION];\n'
-    (ROOT/'src/data/question-bank.ts').write_text(entry)
-    (ROOT/'docs').mkdir(exist_ok=True)
-    (ROOT/'docs/EXTRACTION_REPORT.md').write_text('# Extraction report\n\nVersion: `' + version + '`\n\n' + f'{report["total"]:,} unique records; {report["validated"]:,} structurally validated; {report["needsReview"]:,} excluded pending review.\n\n' + '| Subject | Records | Available |\n|---|---:|---:|\n' + '\n'.join(f'| {s} | {v["total"]} | {v["validated"]} |' for s, v in summary.items()) + '\n\nFull source inventory, duplicate mappings, conflicts, raw unresolved records and issue counts: [`report.json`](../src/data/versions/' + version + '/report.json).\n\nStructural validation verifies extraction and key pairing; it does not certify the medical currency or correctness of the historical source. Unresolved figures, tables, case dependencies and source corrections remain quarantined. Original PDFs retain the visual source.\n')
+    (WRITE_ROOT/'src/data/question-bank.ts').write_text(entry)
+    (WRITE_ROOT/'docs').mkdir(exist_ok=True)
+    (WRITE_ROOT/'docs/EXTRACTION_REPORT.md').write_text('# Extraction report\n\nVersion: `' + version + '`\n\n' + f'{report["total"]:,} unique records; {report["validated"]:,} structurally validated; {report["needsReview"]:,} excluded pending review.\n\n' + '| Subject | Records | Available |\n|---|---:|---:|\n' + '\n'.join(f'| {s} | {v["total"]} | {v["validated"]} |' for s, v in summary.items()) + '\n\nFull source inventory, duplicate mappings, conflicts, raw unresolved records and issue counts: [`report.json`](../src/data/versions/' + version + '/report.json).\n\nStructural validation verifies extraction and key pairing; it does not certify the medical currency or correctness of the historical source. Unresolved figures, tables, case dependencies and source corrections remain quarantined. Original PDFs retain the visual source.\n')
 
 
 if __name__ == '__main__':

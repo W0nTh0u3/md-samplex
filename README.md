@@ -79,6 +79,8 @@ npm run validate:bank
 
 Every version includes `report.json`: input SHA-256 hashes, source/page inventory, duplicate mappings, conflicts, issue counts, and every excluded record with its raw text. `needs_review` records cannot enter scored sessions. Unresolved diagrams/tables remain in the original PDFs and are quarantined; the MVP does not flatten uncertain figures into scored text questions. Explicitly reviewed case groups retain shared context; unresolved dependencies are excluded.
 
+The enabled `raw pdfs/MEDQBANK-OCTOBER2025.pdf` source uses the dedicated coordinate-aware [`scripts/medqbank_import.py`](scripts/medqbank_import.py) adapter. It retains source-order numbering, page locators, and each printed section date, including the April 2025 Microbiology and Physiology sections. Answer text becomes a key only when it uniquely matches a choice; incomplete, missing, ambiguous, or multiple-response records stay `needs_review`. Explanation text remains selectable. Matched explanation-column images are stored as hash-checked feedback-only assets under `public/assets/medqbank`; question-cell visuals are quarantined for review, and unattached visuals remain listed by PDF page and location in the extraction report.
+
 Notion content can be imported into the canonical bank from a local HTML/Markdown export or from the verified public snapshot source. A Notion export may be one file or a directory of page files. For one file, add its path, `subject`, and canonical URL to the disabled Notion entry in the source manifest. For a directory, add a `subjects` map keyed by each relative HTML/Markdown filename, or use subject-named filenames. Then enable the entry and run `npm run extract`. Before enabling it, inspect a local page with `npm run extract:notion -- path/to/page.html --subject biochemistry --url https://... --output .local/notion-review.json`. Explicit answer keys or one unambiguous highlighted choice are required; multiple-response, matching, fill-in, figure-dependent, malformed, conflicting, and incomplete records remain `needs_review`. `With Ratio` and `For Revision` are retained as source metadata, never used as a substitute for parsed rationale content. Per-option rationales are optional at the type boundary and the validated correct-choice rationale fills the legacy overall explanation only when the overall field is absent.
 
 Verified local visuals and reviewed multiple-response overrides are opt-in through [`scripts/visual-manifest.json`](scripts/visual-manifest.json). Store immutable files under `public/assets/` and record each asset’s SHA-256, kind, alt text, source locator, and visibility. A dependent question is eligible only when its required asset and answer key are independently verified; answer-marked captures are feedback-only and cannot satisfy a question visual. The checked-in manifest is intentionally empty, so the current unresolved visual and multiple-response records remain excluded until review.
@@ -90,7 +92,7 @@ The scanned PLE PDF is intentionally disabled in the manifest. Install Tesseract
 ```bash
 .venv/bin/pip install -r scripts/requirements.txt
 .venv/bin/python scripts/ocr_pdf.py "raw pdfs/821551629-Ple-Test-Bank-compressed.pdf" \
-  --layout --pages 1-10,216-225,426-435 --output .local/ocr-ple-layout-sample.json
+  --layout --psm 4 --pages 1-10,216-225,426-435 --output .local/ocr-ple-layout-sample.json
 ```
 
 The layout pass retains Tesseract TSV word coordinates and separates the left
@@ -104,7 +106,7 @@ After the representative review, run the same adapter across the complete scanne
 
 ```bash
 .venv/bin/python scripts/ocr_pdf.py "raw pdfs/821551629-Ple-Test-Bank-compressed.pdf" \
-  --layout --pages 1-435 --output .local/ocr-ple-layout-full.json
+  --layout --psm 4 --pages 1-435 --output .local/ocr-ple-layout-full.json
 ```
 
 The full-pass JSON is a local, review-only artifact; it does not enable the
@@ -115,6 +117,16 @@ Build conservative question-and-answer candidates from that report with
 `npm run extract:ocr`. The command preserves each raw OCR block, coordinate
 layout, and source page locator. Every candidate remains `needs_review` because
 OCR cannot prove the answer highlight, clinical text, or ambiguous boundaries.
+
+Render feedback-only explanation crops from the original PDF and structurally
+double-check every OCR question/answer locator with `npm run review:ocr`. This
+writes `.local/ocr-ple-explanation-assets/`, the review manifest, and
+`.local/ocr-ple-source-audit.json`, then enriches the local qbank with
+`explanationVisuals`. The crops retain the source table/image layout and are
+never placed in `public/assets` or exposed before feedback. The audit checks
+the source hash, page boundaries, option labels/text, and answer-column key;
+it does not independently validate historical clinical correctness. Missing or
+ambiguous OCR remains `needs_review`.
 
 The completed representative-page review and quarantined source findings are recorded in [`docs/OCR_SAMPLE_REVIEW.md`](docs/OCR_SAMPLE_REVIEW.md).
 
